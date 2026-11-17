@@ -64,6 +64,7 @@ function Sidebar({ view, selectedStage, selectedChapter, completed, dayDone, onS
           </a>
         ))}
       </nav>
+      <span className="mobile-progress">学习进度 {completed.size} / {chapters.length} 章{dayDone && ' · 第一天已完成'}</span>
       <nav className="stage-nav" aria-label="学习阶段">
         <div className="section-caption">学习阶段 <span>{chapters.length} 章</span></div>
         {stages.map((stage) => {
