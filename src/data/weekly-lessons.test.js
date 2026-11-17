@@ -39,20 +39,33 @@ test('each published lesson has an explanation, demonstration, new practice data
     assert.ok(lesson.demo.steps.every(({ action, result }) => anyText(action) && anyText(result)), label);
     const { practice } = lesson;
     assert.ok(['brief', 'data', 'hint', 'evidence'].every((key) => anyText(practice[key])), label);
+    assert.ok(anyText(practice.work?.task) && anyText(practice.work?.reference), label);
+    assert.notEqual(practice.work.task, practice.work.reference, label);
     assert.notEqual(practice.data, lesson.demo.intro, label);
     assert.equal(practice.questions.length, 2, label);
-    for (const { prompt, options, answer, explanation } of practice.questions) {
-      assert.ok(anyText(prompt) && anyText(explanation) && Number.isFinite(answer), label);
+    assert.ok(practice.questions.some(({ options }) => !options), 'Independent answer in ' + label);
+    for (const { prompt, options, answer, explanation, accepted } of practice.questions) {
+      assert.ok(anyText(prompt) && anyText(explanation) && (Number.isFinite(answer) || anyText(answer)), label);
       if (options) {
         assert.ok(options.length > 1 && options.every(anyText), label);
         assert.equal(new Set(options).size, options.length, label);
         assert.ok(Number.isInteger(answer) && answer >= 0 && answer < options.length, label);
       }
+      if (accepted) assert.ok(typeof answer === 'string' && accepted.every(anyText), label);
     }
     const answers = practice.questions.map(({ answer }) => String(answer));
     assert.equal(practiceReady(practice.questions, answers), true, label);
     assert.ok(gradePractice(practice.questions, answers).every(({ correct }) => correct), label);
   }
+});
+
+test('constructed answers check aliases, Unicode formatting and order', () => {
+  const questions = [{ answer: 'A,B', accepted: ['A→B'] }];
+  assert.equal(practiceReady(questions, ['   ']), false);
+  assert.equal(practiceReady(questions, ['B,A']), true);
+  assert.equal(gradePractice(questions, ['B,A'])[0].correct, false);
+  assert.equal(gradePractice(questions, ['ａ、 b'])[0].correct, true);
+  assert.equal(gradePractice(questions, ['a→b'])[0].correct, true);
 });
 
 test('numeric and choice inputs reject empty and malformed answers and accept decimal formatting', () => {
@@ -62,5 +75,6 @@ test('numeric and choice inputs reject empty and malformed answers and accept de
   assert.equal(practiceReady(questions, ['0x1', '0']), false);
   assert.equal(practiceReady(questions, ['-1.25', '2']), false);
   assert.equal(practiceReady(questions, ['－１．２５', '0']), true);
+  assert.equal(gradePractice(questions, ['−1.25', '0'])[0].correct, true);
   assert.deepEqual(gradePractice(questions, ['－１．２５', '1']).map(({ correct }) => correct), [true, false]);
 });

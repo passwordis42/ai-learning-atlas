@@ -28,6 +28,10 @@ async function loadLesson(entry) {
   return lessons.find(({ week }) => week === entry.week);
 }
 
+function LessonTerms({ terms }) {
+  return <div className="week-terms">{terms.map((term) => <LessonTerm key={term.word} term={term.word} definition={term} />)}</div>;
+}
+
 function Explain({ lesson, definitions }) {
   return (
     <>
@@ -39,7 +43,7 @@ function Explain({ lesson, definitions }) {
           <div key={key}><dt>{label}</dt><dd><GlossaryText text={lesson.flow[key]} definitions={definitions} /></dd></div>
         ))}
       </dl>
-      <div className="week-terms"><span>本课术语</span>{lesson.terms.map((term) => <LessonTerm key={term.word} term={term.word} definition={term} />)}</div>
+      <div className="week-glossary"><strong>本课术语</strong><LessonTerms terms={lesson.terms} /></div>
     </>
   );
 }
@@ -71,7 +75,7 @@ function Demo({ demo, seen, update, definitions }) {
   );
 }
 
-function Practice({ practice, answers, onAnswer, onSubmit, definitions, week }) {
+function Practice({ practice, answers, work, onWork, onAnswer, onSubmit, definitions, week, ready }) {
   return (
     <>
       <p><GlossaryText text={practice.brief} definitions={definitions} /></p>
@@ -79,6 +83,13 @@ function Practice({ practice, answers, onAnswer, onSubmit, definitions, week }) 
       <details className="review-box"><summary>卡住了？看一条提示</summary><p><GlossaryText text={practice.hint} definitions={definitions} /></p></details>
       <PracticeLabs week={week} />
       <form id="weekly-practice" className="week-practice" onSubmit={onSubmit}>
+        <fieldset className="week-work">
+          <legend>先自己做一遍</legend>
+          <p id="week-work-prompt"><GlossaryText text={practice.work.task} definitions={definitions} /></p>
+          <label htmlFor="week-work">我的操作记录</label>
+          <textarea id="week-work" aria-describedby="week-work-prompt" rows={4} maxLength={1800} required value={work}
+            placeholder="写下你实际得到的中间结果或操作步骤。" onChange={(event) => onWork(event.target.value)} />
+        </fieldset>
         {practice.questions.map((question, index) => (
           <fieldset key={index}>
             <legend><span>{index + 1}</span> {question.prompt}</legend>
@@ -91,16 +102,18 @@ function Practice({ practice, answers, onAnswer, onSubmit, definitions, week }) 
               ))}</div>
             ) : (
               <div className="week-number-field">
-                <input className="week-answer" aria-label={'第 ' + (index + 1) + ' 题答案'} aria-describedby={'week-number-hint-' + index}
-                  type="text" inputMode="decimal" autoComplete="off" maxLength={30} value={answers[index] ?? ''}
-                  placeholder="输入数字" onChange={(event) => onAnswer(index, event.target.value)} />
-                <span id={'week-number-hint-' + index}>只填数字，单位和格式以题目为准。</span>
+                <input className={typeof question.answer === 'string' ? 'week-answer week-answer-text' : 'week-answer'}
+                  aria-label={'第 ' + (index + 1) + ' 题答案'} aria-describedby={'week-number-hint-' + index}
+                  type="text" inputMode={typeof question.answer === 'number' ? 'decimal' : undefined} autoComplete="off"
+                  maxLength={typeof question.answer === 'number' ? 30 : 150} value={answers[index] ?? ''}
+                  placeholder={typeof question.answer === 'number' ? '输入数字' : '按题目格式输入'} onChange={(event) => onAnswer(index, event.target.value)} />
+                <span id={'week-number-hint-' + index}>{typeof question.answer === 'number' ? '只填数字，单位和格式以题目为准。' : '按题目要求填写，大小写和空格都可以。'}</span>
               </div>
             )}
           </fieldset>
         ))}
       </form>
-      {!practiceReady(practice.questions, answers) && <p className="fineprint">两题都有作答后，就能核对结果。</p>}
+      {!ready && <p className="fineprint">写下操作记录并答完两题后，就能核对。</p>}
     </>
   );
 }
@@ -110,6 +123,14 @@ function Results({ lesson, entry, scores, update, state, definitions }) {
   const further = entry.week ? electiveEntries.filter(({ after }) => after === entry.week) : [];
   return (
     <>
+      <section className="week-work-review" aria-label="对照操作过程">
+        <h3>对照操作过程</h3>
+        <div className="week-work-columns">
+          <div><strong>你的记录</strong><p>{state.submission.work}</p></div>
+          <div><strong>参考过程</strong><p><GlossaryText text={lesson.practice.work.reference} definitions={definitions} /></p></div>
+        </div>
+        <p className="fineprint">逐步检查用了哪条规则、得到了什么。写法可以不同，关键是步骤与结果能对上。</p>
+      </section>
       <p className="guide-note" role="status">{correctCount} / {scores.length} 题与参考结果一致。你可以对照下面的过程，再决定是否重试。</p>
       <ol className="week-feedback">
         {lesson.practice.questions.map(({ prompt, explanation }, index) => {
@@ -146,18 +167,19 @@ function Results({ lesson, entry, scores, update, state, definitions }) {
 }
 
 function LessonGuide({ lesson, entry, state, onUpdate, next, overviewHref, onContinue }) {
-  const canReview = Boolean(state.checked);
+  const canReview = Boolean(state.submission || state.checked);
   const stepLimit = canReview ? 3 : state.furthest ?? 0;
   const phase = Math.min(state.phase ?? 0, stepLimit);
   const lessonHeading = useRef(null);
   const heading = useRef(null);
   const moving = useRef(false);
   const definitions = useMemo(() => Object.fromEntries(lesson.terms.map((term) => [term.word, term])), [lesson.terms]);
-  const answers = state.answers ?? noAnswers;
+  const answers = state.practice?.answers ?? noAnswers;
+  const work = state.practice?.work ?? '';
   const demonstrated = state.seen ?? 0;
   const demoReady = demonstrated === lesson.demo.steps.length || stepLimit > 1;
-  const ready = practiceReady(lesson.practice.questions, answers);
-  const scores = canReview ? gradePractice(lesson.practice.questions, state.checked) : [];
+  const ready = Boolean(work.trim()) && practiceReady(lesson.practice.questions, answers);
+  const scores = state.submission ? gradePractice(lesson.practice.questions, state.submission.answers) : [];
 
   useEffect(() => { lessonHeading.current?.focus({ preventScroll: true }); }, []);
 
@@ -175,13 +197,13 @@ function LessonGuide({ lesson, entry, state, onUpdate, next, overviewHref, onCon
 
   function check(event) {
     event.preventDefault();
-    if (ready) move(3, { checked: [...answers] });
+    if (ready) move(3, { submission: { answers: [...answers], work: work.trim() } });
   }
 
   function writeAnswer(index, value) {
     const rewritten = [...answers];
     rewritten[index] = value;
-    onUpdate({ answers: rewritten });
+    onUpdate({ practice: { ...state.practice, answers: rewritten } });
   }
 
   const previous = entry.week > 1 ? weekHref(entry.week - 1) : '#day-1';
@@ -211,10 +233,14 @@ function LessonGuide({ lesson, entry, state, onUpdate, next, overviewHref, onCon
             <div className="guide-next"><ArrowRight size={15} /><strong>接下来</strong><span>{nextHeading}</span></div>
           </div>
           <div className="guide-content" key={phase}>
+            {phase > 0 && <details className="review-box week-review-terms"><summary>随手查本课术语</summary><LessonTerms terms={lesson.terms} /></details>}
             {phase === 0 && <Explain lesson={lesson} definitions={definitions} />}
             {phase === 1 && <Demo demo={lesson.demo} seen={demonstrated} update={onUpdate} definitions={definitions} />}
-            {phase === 2 && <Practice practice={lesson.practice} answers={answers} onAnswer={writeAnswer} onSubmit={check} definitions={definitions} week={entry.week} />}
-            {phase === 3 && <Results lesson={lesson} entry={entry} scores={scores} update={onUpdate} state={state} definitions={definitions} />}
+            {phase === 2 && <Practice practice={lesson.practice} answers={answers} work={work} onWork={(value) => onUpdate({ practice: { ...state.practice, work: value } })}
+              onAnswer={writeAnswer} onSubmit={check} definitions={definitions} week={entry.week} ready={ready} />}
+            {phase === 3 && (state.submission
+              ? <Results lesson={lesson} entry={entry} scores={scores} update={onUpdate} state={state} definitions={definitions} />
+              : <><p className="guide-note">这课的练习已更新。你可以回到练习，提交这次的操作过程和答案。</p>{state.note && <div className="week-old-note"><strong>上次的学习笔记</strong><p>{state.note}</p></div>}</>)}
           </div>
           <div className="guide-actions">
             {phase > 0 && <button className="action secondary" type="button" onClick={() => move(phase - 1)}><ArrowLeft size={16} />{phase === 3 ? '回到练习' : '上一步'}</button>}
