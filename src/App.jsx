@@ -64,8 +64,8 @@ function Sidebar({ view, selectedStage, selectedChapter, completed, dayDone, onS
           </a>
         ))}
       </nav>
-      <span className="mobile-progress">学习进度 {completed.size} / {chapters.length} 章{dayDone && ' · 第一天已完成'}</span>
-      <nav className="stage-nav" aria-label="学习阶段">
+      {view === 'map' && <span className="mobile-progress">学习进度 {completed.size} / {chapters.length} 章{dayDone && ' · 第一天已完成'}</span>}
+      {view === 'map' && <nav className="stage-nav" aria-label="学习阶段">
         <div className="section-caption">学习阶段 <span>{chapters.length} 章</span></div>
         {stages.map((stage) => {
           const expanded = view === 'map' && selectedStage === stage.id;
@@ -91,12 +91,12 @@ function Sidebar({ view, selectedStage, selectedChapter, completed, dayDone, onS
             </div>
           );
         })}
-      </nav>
-      <div className="sidebar-progress">
+      </nav>}
+      {view === 'map' && <div className="sidebar-progress">
         <div><span>学习进度</span><strong>{completed.size} / {chapters.length} 章</strong></div>
         <progress aria-label="已完成章节" max={chapters.length} value={completed.size} />
         <small>{dayDone ? '第一天练习已完成' : '从第一天课程开始'} · 进度保存在此浏览器</small>
-      </div>
+      </div>}
     </aside>
   );
 }
@@ -110,7 +110,7 @@ function Project({ project }) {
   );
 }
 
-function Inspector({ stage, chapter, completed, onToggle, onChapterSelect, dayDone }) {
+function Inspector({ stage, chapter, completed, onToggle, onChapterSelect, dayAction }) {
   if (chapter) {
     return (
       <section className="inspector panel" aria-label="章节详情">
@@ -138,7 +138,7 @@ function Inspector({ stage, chapter, completed, onToggle, onChapterSelect, dayDo
         <span className="label-chip">第一天</span>
         <h2>{dayOne.title}</h2>
         <p>{dayOne.objective}</p>
-        <a href="#day-1" className="action primary">{dayDone ? '复习第一天' : '开始第一天'} <ArrowRight size={18} /></a>
+        <a href="#day-1" className="action primary">{dayAction} <ArrowRight size={18} /></a>
         <div className="inspector-note outcomes">
           <strong>练习目标</strong>
           <ul>
@@ -225,9 +225,18 @@ export default function App() {
   const [dayDone, setDayDone] = useProgress('day-one-complete', false);
   const [reflection, setReflection] = useProgress('day-one-reflection', null);
   const [scopeConfirmed, setScopeConfirmed] = useProgress('day-one-scope', false);
+  const [position, setPosition] = useProgress('day-one-guide', null);
+  const [draft, setDraft] = useProgress('day-one-judgment-draft', null);
+  const [experiment, setExperiment] = useProgress('day-one-experiment', '');
   const completed = new Set(completedIds);
   const stage = stages.find(({ id }) => id === selectedStage) ?? stages[0];
   const chapter = chapterById.get(selectedChapter);
+  const dayAction = dayDone ? '复习第一天' : position || reflection ? '继续第一天' : '开始第一天';
+  const tutorPanel = reflection && scopeConfirmed && (
+    <Suspense fallback={<div className="lesson-card panel" role="status">正在打开 AI 学伴…</div>}>
+      <Tutor context={`AI 学习图谱 · 第一阶段第一天：${dayOne.title}\n${dayOne.objective}\n${dayOne.prompt}\n\n学习者已保存自己的判断。\n预计保留 ${reflection.rows} 条。\n理由：${reflection.reason}\n证据：${reflection.evidence}`} />
+    </Suspense>
+  );
 
   useEffect(() => {
     const handleHash = () => setView(getView());
@@ -270,7 +279,7 @@ export default function App() {
       <main className="workspace" id="main-content" tabIndex={-1}>
         <header className="topbar">
           <div className="breadcrumb"><span>学习路线</span><ChevronRight size={15} /><span>{links.find(({ id }) => id === view).title}</span></div>
-          {view === 'map' ? <a className="action top-action" href="#day-1">第一天课程 <ArrowRight size={16} /></a> : <a className="action top-action" href="#map"><LayoutGrid size={16} />返回图谱</a>}
+          {view === 'map' ? <a className="action top-action" href="#day-1">{dayAction} <ArrowRight size={16} /></a> : <a className="action top-action" href={view === 'tutor' ? '#day-1' : '#map'}><LayoutGrid size={16} />{view === 'tutor' ? '返回课程' : '返回图谱'}</a>}
         </header>
         {view === 'map' && (
           <>
@@ -284,20 +293,20 @@ export default function App() {
                   <KnowledgeGraph selectedStage={stage.id} selectedChapter={selectedChapter} completed={completed} onStageSelect={selectStage} onChapterSelect={selectChapter} />
                 </Suspense>
               </section>
-              <Inspector stage={stage} chapter={chapter} completed={completed} onToggle={toggleCompleted} onChapterSelect={selectChapter} dayDone={dayDone} />
+              <Inspector stage={stage} chapter={chapter} completed={completed} onToggle={toggleCompleted} onChapterSelect={selectChapter} dayAction={dayAction} />
             </div>
             <RouteDetails selectedStage={selectedStage} onChapterSelect={selectChapter} completed={completed} />
           </>
         )}
-        {view === 'day-1' && <DayOne lesson={dayOne} checklist={checklist} setChecklist={setChecklist} done={dayDone} setDone={setDayDone} reflection={reflection} setReflection={setReflection} scopeConfirmed={scopeConfirmed} setScopeConfirmed={setScopeConfirmed} />}
+        {view === 'day-1' && (
+          <DayOne lesson={dayOne} checklist={checklist} setChecklist={setChecklist} done={dayDone} setDone={setDayDone}
+            reflection={reflection} setReflection={setReflection} scopeConfirmed={scopeConfirmed} setScopeConfirmed={setScopeConfirmed}
+            position={position} setPosition={setPosition} draft={draft} setDraft={setDraft} experiment={experiment} setExperiment={setExperiment} tutorPanel={tutorPanel} />
+        )}
         {view === 'tutor' && (
           <div className="tutor-page">
             <div className="hero"><h1>AI 学伴</h1><p>用提示提问、解释代码和排查错误，最后由你验证结果。</p></div>
-            {reflection && scopeConfirmed ? (
-              <Suspense fallback={<div className="lesson-card panel" role="status">正在打开 AI 学伴…</div>}>
-                <Tutor context={`AI 学习图谱 · 第一阶段第一天：${dayOne.title}\n${dayOne.objective}\n${dayOne.prompt}\n\n学习者已保存自己的判断。\n预计保留 ${reflection.rows} 条。\n理由：${reflection.reason}\n证据：${reflection.evidence}`} />
-              </Suspense>
-            ) : (
+            {tutorPanel || (
               <section className="lesson-card panel tutor-gate">
                 <div className="lesson-section-title"><LockKeyhole size={22} /><h2>{reflection ? '先确认委托范围与规则' : '先做一次独立判断'}</h2></div>
                 <p>{reflection ? '回到第一天课程，确认要处理哪个文件、怎样去重、输出保存到哪里。' : '回到第一天课程，写下你预计会保留几行、为什么，以及你用到的是哪几条记录。保存后再核对要交给 AI 的任务。'}</p>

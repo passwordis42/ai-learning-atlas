@@ -1,5 +1,22 @@
-import { useState } from 'react';
-import { ArrowRight, BookOpen, Check, ClipboardList, Clock3, Download, FileText, MessageCircle, Save } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { ArrowLeft, ArrowRight, Check, Clock3, Copy, Download } from 'lucide-react';
+import './lesson-guide.css';
+
+const guideSteps = [
+  { title: '认识 CSV', task: '先分清表头、空记录和重复记录，再去看真实样本。', minutes: 5 },
+  { title: '手算并记录判断', task: '根据规则预测清洗后会剩几条，并写出你检查了哪些记录。', minutes: 10 },
+  { title: '请 AI 起草脚本', task: '确认输入、处理规则和输出文件，然后请 AI 生成脚本。', minutes: 10 },
+  { title: '运行并核对', task: '运行脚本，把它生成的文件和你手算的结果逐条对照。', minutes: 20 },
+  { title: '改规则，再跑一次', task: '亲手改一处去重规则，记录这次结果和发生变化的原因。', minutes: 10 },
+];
+const finish = guideSteps.length;
+const outputChecks = [1, 2, 3];
+const emptyDraft = { rows: '', reason: '', evidence: '' };
+
+function judgmentReady(fields) {
+  const rows = Number(fields.rows);
+  return fields.rows !== '' && Number.isInteger(rows) && rows >= 0 && rows <= 10 && Boolean(fields.reason.trim() && fields.evidence.trim());
+}
 
 function downloadExercise(csv) {
   const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
@@ -10,101 +27,271 @@ function downloadExercise(csv) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-function Reflection({ lesson, reflection, setReflection }) {
-  const [rows, setRows] = useState(reflection?.rows ?? '');
-  const [reason, setReason] = useState(reflection?.reason ?? '');
-  const [evidence, setEvidence] = useState(reflection?.evidence ?? '');
-  const valid = rows !== '' && reason.trim() && evidence.trim();
+function Sample({ csv }) {
+  return (
+    <details className="guide-sample" open>
+      <summary>查看 10 条样本</summary>
+      <div className="code-frame">
+        <div><span>tickets.csv</span><button className="action small-action" onClick={() => downloadExercise(csv)}><Download size={15} />下载样本</button></div>
+        <pre><code>{csv.trimEnd()}</code></pre>
+      </div>
+    </details>
+  );
+}
 
-  function save(event) {
-    event.preventDefault();
-    if (valid) setReflection({ rows: Number(rows), reason: reason.trim(), evidence: evidence.trim() });
+function Judgment({ draft, setDraft, onSave }) {
+  function update(field, value) {
+    setDraft((old) => ({ ...(old ?? emptyDraft), [field]: value }));
   }
 
   return (
-    <form className="lesson-card panel reflection" onSubmit={save}>
-      <div className="lesson-section-title"><ClipboardList size={21} /><h2>先交自己的判断</h2></div>
-      <p>看着上面的 CSV 手算一遍。按规则预测保留几条，并指出被删除的是哪些记录。</p>
-      <label>我预测保留的记录数 <input type="number" min="0" max="10" step="1" required value={rows} onChange={(event) => setRows(event.target.value)} /></label>
-      <label>我的判断理由 <textarea rows={2} required maxLength={500} value={reason} placeholder="例如，先检查两列是否都空，再检查整行是否重复。" onChange={(event) => setReason(event.target.value)} /></label>
-      <label>我用到的证据 <textarea rows={2} required maxLength={650} value={evidence} placeholder="写下几条具体记录或它们所在的数据行。" onChange={(event) => setEvidence(event.target.value)} /></label>
-      <button className="action primary" type="submit" disabled={!valid}><Save size={17} />保存判断，再打开反馈</button>
-      <p className="fineprint" role="status">{reflection ? '判断已保存在此浏览器。你可以打开核对结果或 AI 学伴。' : '这一份学习记录保存在当前浏览器。'}</p>
-      {reflection && (
-        <details className="review-box">
-          <summary>核对自己的计算</summary>
-          <p><b>你的预测</b>　{reflection.rows} 条。{reflection.rows === lesson.expectedRows ? '和练习预期一致。' : '请对照空记录和重复记录，再数一遍。'}</p>
-          <p>{lesson.expectedSummary}</p>
-        </details>
-      )}
+    <form id="guide-judgment" className="reflection" onSubmit={(event) => {
+      event.preventDefault();
+      if (judgmentReady(draft)) onSave({ rows: Number(draft.rows), reason: draft.reason.trim(), evidence: draft.evidence.trim() });
+    }}>
+      <label>我预测保留的记录数
+        <input type="number" min="0" max="10" step="1" required value={draft.rows} onChange={(event) => update('rows', event.target.value)} />
+      </label>
+      <label>我的理由
+        <textarea rows={2} required maxLength={500} value={draft.reason} placeholder="你是按什么规则判断的？" onChange={(event) => update('reason', event.target.value)} />
+      </label>
+      <label>我的证据
+        <textarea rows={2} required maxLength={650} value={draft.evidence} placeholder="写下几条具体记录或它们所在的数据行。" onChange={(event) => update('evidence', event.target.value)} />
+      </label>
     </form>
   );
 }
 
-export default function DayOne({ lesson, checklist, setChecklist, done, setDone, reflection, setReflection, scopeConfirmed, setScopeConfirmed }) {
-  const allChecked = lesson.checklist.every((_, index) => checklist.includes(index));
+function AiDraft({ lesson, reflection, scopeConfirmed, setScopeConfirmed, tutorPanel }) {
+  const [copyStatus, setCopyStatus] = useState('');
+  const [showTutor, setShowTutor] = useState(false);
+  const promptRef = useRef(null);
 
-  function checkItem(index) {
-    setChecklist((old) => old.includes(index) ? old.filter((value) => value !== index) : [...old, index]);
-    if (done) setDone(false);
+  async function copyPrompt() {
+    try {
+      await navigator.clipboard.writeText(lesson.prompt);
+      setCopyStatus('已复制。把提示词粘贴到你的 AI 工具，生成脚本后保存为 clean_tickets.py。');
+    } catch {
+      promptRef.current?.focus();
+      promptRef.current?.select();
+      setCopyStatus('提示词已选中，可以手动复制。');
+    }
   }
 
   return (
     <>
-      <div className="hero lesson-hero">
+      <p className="guide-note" role="status">
+        你的预测是 {reflection.rows} 条。{reflection.rows === lesson.expectedRows ? '和手算参考结果一致。' : '可以先对照空记录和重复记录，再核对一次。'}
+      </p>
+      <details className="review-box"><summary>核对手算结果</summary><p>{lesson.expectedSummary}</p></details>
+      <div className="guide-block">
+        <h3>核对委托范围</h3>
+        <ul>
+          <li>输入文件是 <code>tickets.csv</code>，先去掉字段首尾空白，再丢弃两列都为空的记录。</li>
+          <li>只有问题和分类都相同才算重复，保留第一次出现的记录。</li>
+          <li>结果另存为 <code>clean_tickets.csv</code>，保留原始文件。</li>
+        </ul>
+        <label className="scope-check"><input type="checkbox" checked={scopeConfirmed} onChange={(event) => setScopeConfirmed(event.target.checked)} />我确认输入、规则和输出。遇到不清楚的地方，先让 AI 向我提问。</label>
+      </div>
+      {scopeConfirmed && (
+        <div className="guide-block">
+          <label className="guide-prompt-label">本课提示词
+            <textarea className="guide-prompt" ref={promptRef} readOnly rows={4} value={lesson.prompt} />
+          </label>
+          <div className="guide-inline">
+            <button className="action secondary" type="button" onClick={copyPrompt}><Copy size={16} />复制本课提示词</button>
+            <button className="action secondary" aria-expanded={showTutor} type="button" onClick={() => setShowTutor(!showTutor)}>{showTutor ? '收起 AI 学伴' : '在这里打开 AI 学伴'}</button>
+          </div>
+          {copyStatus && <p className="guide-note" role="status">{copyStatus}</p>}
+          {showTutor && tutorPanel}
+        </div>
+      )}
+    </>
+  );
+}
+
+function Checks({ items, labels, checklist, onCheck }) {
+  return (
+    <div className="guide-checks">
+      {items.map((index) => (
+        <label key={index}>
+          <input type="checkbox" checked={checklist.includes(index)} onChange={() => onCheck(index)} />{labels[index]}
+        </label>
+      ))}
+    </div>
+  );
+}
+
+function WeekPractice() {
+  return (
+    <details className="review-box">
+      <summary className="action primary">打开下一项练习 <ArrowRight size={16} /></summary>
+      <p>在单独的练习文件夹里保留两版脚本和原样本。每次将测试样本放在脚本旁边并命名为 tickets.csv，先写预期，再运行并保存结果。</p>
+      <ul>
+        <li>正常样本：放入一条有效记录，验证它会被保留。</li>
+        <li>全空样本：只填两个空字段，验证输出是否仍保留表头。</li>
+        <li>分类冲突：同一问题配两个分类，比较两种去重规则各保留什么。</li>
+      </ul>
+      <p>记录在什么输入下结果不符合预期，并尝试用一句话说明原因。</p>
+    </details>
+  );
+}
+
+export default function DayOne({
+  lesson, checklist, setChecklist, done, setDone, reflection, setReflection, scopeConfirmed, setScopeConfirmed,
+  position, setPosition, draft, setDraft, experiment, setExperiment, tutorPanel,
+}) {
+  const ranChecks = outputChecks.every((index) => checklist.includes(index));
+  const limit = !reflection ? 1 : !scopeConfirmed ? 2 : !ranChecks ? 3 : done ? finish : 4;
+  const legacyStep = done ? finish : scopeConfirmed && ranChecks ? 4 : reflection ? 2 : 0;
+  const reached = Math.min(limit, Math.max(position?.reached ?? 0, legacyStep));
+  const step = Math.min(position?.step ?? legacyStep, reached);
+  const current = guideSteps[step];
+  const headingRef = useRef(null);
+  const justNavigated = useRef(false);
+  const draftValue = draft ?? (reflection ? { ...reflection, rows: String(reflection.rows) } : emptyDraft);
+
+  useEffect(() => {
+    if (justNavigated.current) {
+      justNavigated.current = false;
+      window.scrollTo(0, 0);
+      headingRef.current?.focus({ preventScroll: true });
+    }
+  }, [step]);
+
+  function openStep(next) {
+    justNavigated.current = true;
+    setPosition({ step: next, reached: Math.max(reached, next) });
+  }
+
+  function toggleCheck(index) {
+    setChecklist((old) => old.includes(index) ? old.filter((entry) => entry !== index) : [...old, index]);
+    if (done) setDone(false);
+  }
+
+  function saveJudgment(value) {
+    setReflection(value);
+    setChecklist((old) => old.includes(0) ? old : [...old, 0]);
+    openStep(2);
+  }
+
+  function confirmScope(confirmed) {
+    setScopeConfirmed(confirmed);
+    if (!confirmed && done) setDone(false);
+  }
+
+  function finishLesson() {
+    setChecklist((old) => old.includes(4) ? old : [...old, 4]);
+    setDone(true);
+    openStep(finish);
+  }
+
+  const buttons = [
+    <button key="sample" className="action primary" type="button" onClick={() => openStep(1)}>查看样本并预测 <ArrowRight size={18} /></button>,
+    <button key="save" className="action primary" type="submit" form="guide-judgment" disabled={!judgmentReady(draftValue)}>保存判断，去核对规则 <ArrowRight size={18} /></button>,
+    <button key="run" className="action primary" type="button" disabled={!scopeConfirmed} onClick={() => openStep(3)}>脚本已保存，去运行 <ArrowRight size={18} /></button>,
+    <button key="change" className="action primary" type="button" disabled={!ranChecks} onClick={() => openStep(4)}>核对完毕，去改规则 <ArrowRight size={18} /></button>,
+    <button key="finish" className="action primary" type="button" disabled={!experiment.trim() && !checklist.includes(4)} onClick={finishLesson}>完成第一天 <Check size={18} /></button>,
+  ];
+
+  return (
+    <div className="guided-lesson">
+      <header className="guide-header">
         <div className="hero-meta"><span className="label-chip">阶段 1 · 第 1 周 · 第一天</span><span className="time-note"><Clock3 size={16} />约 {lesson.minutes} 分钟</span></div>
         <h1>{lesson.title}</h1>
-        <p>{lesson.objective}</p>
+        <p>今天从一份小样本开始。你会先手算，再请 AI 写代码，最后亲手改一条规则。</p>
+      </header>
+      <div className="guide-progress">
+        <div className="guide-progress-copy"><strong>{current ? `第 ${step + 1} / ${finish} 步` : '第一天已完成'}</strong><span>{reached} / {finish} 步已完成</span></div>
+        <progress aria-label="第一天课程进度" value={reached} max={finish} />
       </div>
-      <div className="lesson-layout">
-        <div className="lesson-body">
-          <section className="lesson-card panel">
-            <div className="lesson-section-title"><BookOpen size={21} /><h2>先认识三个概念</h2></div>
-            <div className="concept-grid">
-              {lesson.concepts.map((concept) => <article key={concept.title}><h3>{concept.title}</h3><p>{concept.body}</p><p className="example">{concept.example}</p></article>)}
+      <div className="guide-layout">
+        <div className="guide-main">
+          <section className="guide-card panel" aria-labelledby="guide-step-title">
+            <div className="guide-card-head">
+              <span className="guide-kicker">{current ? `现在学 · 约 ${current.minutes} 分钟` : '练习完成'}</span>
+              <h2 id="guide-step-title" ref={headingRef} tabIndex={-1}>{current?.title ?? '你完成了第一天的练习'}</h2>
+              <p>{current?.task ?? '保留原始文件、清洗后的文件和改规则前后的运行结果。它们是你今天的验收证据。'}</p>
+              {current && <div className="guide-next"><ArrowRight size={15} /><strong>接下来</strong><span>{guideSteps[step + 1]?.title ?? '完成第一天，查看第 1 周的下一项练习'}</span></div>}
+            </div>
+            <div className="guide-content" key={step}>
+              {step === 0 && (
+                <div className="concept-grid">
+                  {lesson.concepts.map((concept) => <article key={concept.title}><h3>{concept.title}</h3><p>{concept.body}</p><p className="example">{concept.example}</p></article>)}
+                </div>
+              )}
+              {step === 1 && (
+                <>
+                  <p>先删除两列都为空的记录。再比较每一行的「问题」和「分类」，两列都相同时，只保留第一次出现的记录。表头不计入样本数。</p>
+                  <Sample csv={lesson.csv} />
+                  <Judgment draft={draftValue} setDraft={(update) => setDraft((old) => update(old ?? draftValue))} onSave={saveJudgment} />
+                  {!judgmentReady(draftValue) && <p className="fineprint">填入 0 到 10 之间的整数，并写下理由和证据后，就能继续。</p>}
+                </>
+              )}
+              {step === 2 && <AiDraft lesson={lesson} reflection={reflection} scopeConfirmed={scopeConfirmed} setScopeConfirmed={confirmScope} tutorPanel={tutorPanel} />}
+              {step === 3 && (
+                <>
+                  <div className="guide-block">
+                    <p>把 <code>clean_tickets.py</code> 和 <code>tickets.csv</code> 放在同一个文件夹。打开这个文件夹的终端，运行：</p>
+                    <div className="code-frame"><pre><code>python clean_tickets.py</code></pre></div>
+                    <p>Windows 也可以用 <code>py clean_tickets.py</code>。运行后打开生成的 <code>clean_tickets.csv</code>。</p>
+                  </div>
+                  <p className="guide-note" role="status">{lesson.expectedSummary}</p>
+                  <Checks items={outputChecks} labels={lesson.checklist} checklist={checklist} onCheck={toggleCheck} />
+                  {!ranChecks && <p className="fineprint">核对这三项后就能继续。</p>}
+                </>
+              )}
+              {step === 4 && (
+                <>
+                  <p>先复制一份能跑通的脚本，保留原来的版本供对照。</p>
+                  <p>{lesson.steps[4].body}</p>
+                  <div className="guide-block reflection">
+                    <label>这次保留了几条？为什么？
+                      <textarea rows={3} maxLength={650} value={experiment} placeholder="先写下实际结果，再解释哪条记录的命运变了。" onChange={(event) => setExperiment(event.target.value)} />
+                    </label>
+                  </div>
+                  {!experiment.trim() && !checklist.includes(4) && <p className="fineprint">记下运行结果和原因后，就能完成今天的练习。</p>}
+                </>
+              )}
+              {step === finish && (
+                <>
+                  <details className="review-box"><summary>核对复跑结果</summary>{experiment.trim() && <p><strong>你的记录</strong>　{experiment.trim()}</p>}<p>{lesson.reviewAnswer}</p></details>
+                  <div className="guide-complete"><h3>下一项 · 用三种边界样本测试脚本</h3><p>第 1 周继续用今天的脚本，验证它能否处理正常、全空和分类冲突三种情况。</p><WeekPractice /></div>
+                </>
+              )}
+            </div>
+            <div className="guide-actions">
+              {step > 0 && <button className="action secondary" type="button" onClick={() => openStep(step - 1)}><ArrowLeft size={16} />{current ? '上一步' : '回顾最后一步'}</button>}
+              {current ? buttons[step] : <a className="action secondary" href="#map">返回图谱</a>}
             </div>
           </section>
-          <section className="lesson-card panel" id="exercise">
-            <div className="lesson-section-title"><FileText size={21} /><h2>实验数据与处理规则</h2></div>
-            <p>处理顺序是先删整行为空的记录，再按两列内容判断整行重复。每组重复只保留第一次，保持原来的行序。CSV 表头不计入记录数。</p>
-            <div className="code-frame"><div><span>tickets.csv</span><button className="action small-action" onClick={() => downloadExercise(lesson.csv)}><Download size={15} />下载样本</button></div><pre><code>{lesson.csv.trimEnd()}</code></pre></div>
-          </section>
-          <Reflection lesson={lesson} reflection={reflection} setReflection={setReflection} />
-          <section className="lesson-card panel">
-            <div className="lesson-section-title"><MessageCircle size={21} /><h2>请 AI 实现，再亲手验证</h2></div>
-            <ol className="lesson-steps">
-              {lesson.steps.map((step) => <li key={step.title}><div><h3>{step.title}</h3><span>{step.minutes} 分钟</span></div><p>{step.body}</p></li>)}
-            </ol>
-            {reflection ? (
-              <details className="review-box">
-                <summary>查看委托范围与规则，确认后使用 AI</summary>
-                <pre className="prompt-text">{lesson.prompt}</pre>
-                <label className="scope-check"><input type="checkbox" checked={scopeConfirmed} onChange={(event) => setScopeConfirmed(event.target.checked)} />我确认输入样本、清洗规则和单独保存的输出文件。</label>
-                {scopeConfirmed && <a href="#tutor" className="action primary">去 AI 学伴 <ArrowRight size={17} /></a>}
-              </details>
-            ) : <p className="inline-note">保存你的判断、理由和证据之后，委托说明与 AI 学伴就会开放。</p>}
-            <h3 className="review-question">{lesson.reviewQuestion}</h3>
-            {reflection && <details className="review-box"><summary>核对思路</summary><p>{lesson.reviewAnswer}</p></details>}
-          </section>
         </div>
-        <aside className="lesson-aside">
-          <section className="lesson-card panel lesson-checklist">
-            <h2>完成清单</h2>
-            <p>每完成一项，就勾选并保留对应证据。</p>
-            {lesson.checklist.map((label, index) => <label key={label}><input type="checkbox" checked={checklist.includes(index)} onChange={() => checkItem(index)} />{label}</label>)}
-            <button className="action primary" type="button" disabled={!reflection || !allChecked} onClick={() => setDone(!done)}>
-              <Check size={17} />{done ? '第一天已完成 · 取消' : '标记第一天已完成'}
-            </button>
-            <p className="fineprint">建议保留原始 CSV、清洗后的 CSV，以及规则变更前后的运行结果。</p>
-          </section>
-          {lesson.resources?.length > 0 && (
-            <section className="lesson-card panel lesson-resources">
-              <h2>今天的参考资料</h2>
+        <aside className="guide-sidebar" aria-label="本课步骤与资料">
+          <nav className="guide-outline panel" aria-label="本课步骤">
+            <h2>本课步骤</h2>
+            <ol>
+              {guideSteps.map(({ title }, index) => {
+                const status = index === step ? 'current' : index < reached ? 'done' : 'upcoming';
+                return (
+                  <li key={title} className="guide-outline-item" data-state={status}>
+                    <button type="button" disabled={index > reached || index === step} aria-current={index === step ? 'step' : undefined} onClick={() => openStep(index)}>
+                      <span className="guide-step-dot" aria-hidden="true">{status === 'done' ? <Check size={14} /> : index + 1}</span>
+                      <span>{title}</span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ol>
+          </nav>
+          <div className="guide-outline panel">
+            <details className="guide-resources">
+              <summary>参考资料</summary>
               {lesson.resources.map(({ title, url }) => <a key={url} href={url} target="_blank" rel="noreferrer">{title} <ArrowRight size={14} /></a>)}
-            </section>
-          )}
+            </details>
+            <p className="fineprint">步骤与学习记录自动保存在此浏览器。</p>
+          </div>
         </aside>
       </div>
-    </>
+    </div>
   );
 }
