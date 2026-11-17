@@ -38,4 +38,4 @@ GitHub Pages 上可直接复制提示词，交给已有的 AI 聊天工具。要
 
 课程数据位于 `src/data/course.js`。每门课程可以沿用阶段、周安排、资源、实践项目和验收的结构。用章节 `requires` 写前置关系，给选学章节和阶段写出具体理由。课程首页和第一天练习可以沿用页面结构，按主题替换交互和视觉。新课程放在独立仓库时，更新网站名称、页面链接和浏览器进度键。
 
-结构参考本机的 `game-design-atlas` 课程工程，包括周计划、证据记录和先判断后使用 AI 的学习流程。前端构思参考 [roadmap.sh 的可点击路线](https://roadmap.sh/about) 和 [Starlight 的分组导航](https://github.com/withastro/starlight)，可交互图谱使用 [React Flow](https://github.com/xyflow/xyflow)。
+结构参考本机的 `game-design-atlas` 课程工程，包括周计划、证据记录和先判断后使用 AI 的学习流程。分步讲解、站内动手任务和理解检查参考 [nmr-from-zero](https://github.com/passwordis42/nmr-from-zero)。前端构思参考 [roadmap.sh 的可点击路线](https://roadmap.sh/about) 和 [Starlight 的分组导航](https://github.com/withastro/starlight)，可交互图谱使用 [React Flow](https://github.com/xyflow/xyflow)。

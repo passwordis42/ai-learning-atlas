@@ -12,6 +12,16 @@ const guideSteps = [
 const finish = guideSteps.length;
 const outputChecks = [1, 2, 3];
 const emptyDraft = { rows: '', reason: '', evidence: '' };
+const checkRecords = [
+  { id: 1, question: '页面加载慢', category: '性能' },
+  { id: 2, question: '页面加载慢', category: '访问' },
+  { id: 3, question: '页面加载慢', category: '性能' },
+];
+const checkChoices = [
+  { id: 'second', text: '删第 2 条', feedback: '再看分类。第 2 条是「访问」，和第 1 条的「性能」不同，因此应保留。' },
+  { id: 'third', text: '删第 3 条', feedback: '答对了。第 3 条的两个字段都与第 1 条相同，保留第一次出现的记录。' },
+  { id: 'both', text: '删第 2、3 条', feedback: '你找到了相同的问题。再比较分类，只删除两个字段都重复的记录。' },
+];
 
 function judgmentReady(fields) {
   const rows = Number(fields.rows);
@@ -36,6 +46,23 @@ function Sample({ csv }) {
         <pre><code>{csv.trimEnd()}</code></pre>
       </div>
     </details>
+  );
+}
+
+function ConceptCheck({ answer, onAnswer }) {
+  return (
+    <section className="guide-quiz" aria-labelledby="guide-quiz-title">
+      <h3 id="guide-quiz-title">试一试整行去重</h3>
+      <p>三条记录的问题一模一样。按整行去重，哪一条应该删掉？</p>
+      <table className="guide-quiz-table">
+        <thead><tr><th scope="col">记录</th><th scope="col">问题</th><th scope="col">分类</th></tr></thead>
+        <tbody>{checkRecords.map(({ id, question, category }) => <tr key={id}><th scope="row">{id}</th><td>{question}</td><td>{category}</td></tr>)}</tbody>
+      </table>
+      <div className="guide-inline" role="group" aria-label="去重练习答案">
+        {checkChoices.map(({ id, text }) => <button key={id} className="action secondary" type="button" aria-pressed={answer === id} onClick={() => onAnswer(id)}>{text}</button>)}
+      </div>
+      <p role="status" className="guide-note">{checkChoices.find(({ id }) => id === answer)?.feedback}</p>
+    </section>
   );
 }
 
@@ -161,7 +188,7 @@ export default function DayOne({
 
   function openStep(next) {
     justNavigated.current = true;
-    setPosition({ step: next, reached: Math.max(reached, next) });
+    setPosition((old) => ({ ...old, step: next, reached: Math.max(reached, next) }));
   }
 
   function toggleCheck(index) {
@@ -216,14 +243,18 @@ export default function DayOne({
             </div>
             <div className="guide-content" key={step}>
               {step === 0 && (
-                <div className="concept-grid">
-                  {lesson.concepts.map((concept) => <article key={concept.title}><h3>{concept.title}</h3><p>{concept.body}</p><p className="example">{concept.example}</p></article>)}
-                </div>
+                <>
+                  <div className="concept-grid">
+                    {lesson.concepts.map((concept) => <article key={concept.title}><h3>{concept.title}</h3><p>{concept.body}</p><p className="example">{concept.example}</p></article>)}
+                  </div>
+                  <ConceptCheck answer={position?.answer} onAnswer={(answer) => setPosition((old) => ({ ...old, answer }))} />
+                </>
               )}
               {step === 1 && (
                 <>
                   <p>先删除两列都为空的记录。再比较每一行的「问题」和「分类」，两列都相同时，只保留第一次出现的记录。表头不计入样本数。</p>
                   <Sample csv={lesson.csv} />
+                  <details className="review-box"><summary>卡住了？看一条提示</summary><p>给数据从 1 开始编号。先圈出只有逗号的那行。再从上往下比较，只在两个字段都相同时划掉后出现的那条。</p></details>
                   <Judgment draft={draftValue} setDraft={(update) => setDraft((old) => update(old ?? draftValue))} onSave={saveJudgment} />
                   {!judgmentReady(draftValue) && <p className="fineprint">填入 0 到 10 之间的整数，并写下理由和证据后，就能继续。</p>}
                 </>
@@ -236,6 +267,7 @@ export default function DayOne({
                     <div className="code-frame"><pre><code>python clean_tickets.py</code></pre></div>
                     <p>Windows 也可以用 <code>py clean_tickets.py</code>。运行后打开生成的 <code>clean_tickets.csv</code>。</p>
                   </div>
+                  <details className="review-box"><summary>找不到文件？先检查这里</summary><p>确认脚本和样本在同一个文件夹，终端也打开在该目录。检查文件名是不是完整的 tickets.csv，脚本是不是以 .py 结尾。</p></details>
                   <p className="guide-note" role="status">{lesson.expectedSummary}</p>
                   <Checks items={outputChecks} labels={lesson.checklist} checklist={checklist} onCheck={toggleCheck} />
                   {!ranChecks && <p className="fineprint">核对这三项后就能继续。</p>}

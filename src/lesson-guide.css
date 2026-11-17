@@ -53,6 +53,14 @@
 .guide-inline { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; min-width: 0; }
 .guide-note { display: block; min-width: 0; padding: 10px 12px; border-left: 3px solid #8a79cf; border-radius: 0 7px 7px 0; background: var(--guide-tint); color: #423668; font-size: 13px; line-height: 1.65; overflow-wrap: anywhere; }
 .guide-note:empty { display: none; }
+.guide-quiz { display: grid; gap: 8px; padding: 12px; border: 1px solid var(--guide-soft-line); border-radius: 9px; }
+.guide-quiz h3 { font-size: 16px; }
+.guide-quiz > p { color: var(--muted); font-size: 13px; }
+.guide-quiz-table { width: 100%; border-collapse: collapse; text-align: left; font-size: 13px; }
+.guide-quiz-table :is(th, td) { padding: 5px 8px; border-bottom: 1px solid var(--guide-soft-line); }
+.guide-quiz-table thead { color: var(--muted); background: #f7f5fc; }
+.guide-quiz .action { font-size: 12px; }
+.guide-quiz .action[aria-pressed="true"] { background: var(--violet); border-color: var(--accent); }
 .guide-checks { display: grid; gap: 1px; min-width: 0; }
 .guide-checks label, .guide-content .scope-check { display: flex; align-items: flex-start; gap: 8px; min-width: 0; padding: 9px 0; margin: 0; color: var(--ink); font-size: 14px; line-height: 1.6; }
 .guide-checks label + label { border-top: 1px solid var(--guide-soft-line); }

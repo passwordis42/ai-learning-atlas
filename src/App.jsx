@@ -231,7 +231,7 @@ export default function App() {
   const completed = new Set(completedIds);
   const stage = stages.find(({ id }) => id === selectedStage) ?? stages[0];
   const chapter = chapterById.get(selectedChapter);
-  const dayAction = dayDone ? '复习第一天' : position || reflection ? '继续第一天' : '开始第一天';
+  const dayAction = dayDone ? '复习第一天' : position || reflection ? '继续学习' : '开始学习';
   const tutorPanel = reflection && scopeConfirmed && (
     <Suspense fallback={<div className="lesson-card panel" role="status">正在打开 AI 学伴…</div>}>
       <Tutor context={`AI 学习图谱 · 第一阶段第一天：${dayOne.title}\n${dayOne.objective}\n${dayOne.prompt}\n\n学习者已保存自己的判断。\n预计保留 ${reflection.rows} 条。\n理由：${reflection.reason}\n证据：${reflection.evidence}`} />
