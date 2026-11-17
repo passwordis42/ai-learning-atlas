@@ -92,7 +92,7 @@ const testCases = [
 export function WeekPractice() {
   return (
     <details className="review-box">
-      <summary className="action primary">打开下一项练习</summary>
+      <summary>下载三组补充样本</summary>
       <p>建三个小文件夹，各复制一份两版脚本。每个文件夹放一份下方下载的 <code>tickets.csv</code>。先写下两版各应保留几条，再在对应文件夹运行对照。这样每组输出都能保留下来。</p>
       <div className="guide-test-cases">
         {testCases.map(({ id, title, csv, check }) => (

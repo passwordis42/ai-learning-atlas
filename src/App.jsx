@@ -4,26 +4,29 @@ import {
   Clock3, GitFork, LayoutGrid, LockKeyhole, MessageCircle, Play, Target,
 } from 'lucide-react';
 import { dayOne, stages } from './data/course.js';
+import { chapterLessons, lessonEntries, weeklyEntries, weekHref } from './data/lesson-index.js';
 import DayOne from './DayOne.jsx';
 import { GlossaryText } from './LessonTerm.jsx';
 
 const KnowledgeGraph = lazy(() => import('./KnowledgeGraph.jsx'));
 const Tutor = lazy(() => import('./Tutor.jsx'));
+const WeeklyLesson = lazy(() => import('./WeeklyLesson.jsx'));
 
 const repo = 'https://github.com/passwordis42/ai-learning-atlas';
 const chapters = stages.flatMap((stage) => stage.chapters);
 const stageByChapter = new Map(stages.flatMap((stage) => stage.chapters.map(({ id }) => [id, stage])));
 const chapterById = new Map(chapters.map((chapter) => [chapter.id, chapter]));
-const weekCount = stages.reduce((total, stage) => total + stage.weeks.length, 0);
+const weekCount = weeklyEntries.length;
+const emptyWeek = {};
 const links = [
   { id: 'map', title: '图谱总览', icon: LayoutGrid },
-  { id: 'day-1', title: '第一天课程', icon: Play },
+  { id: 'day-1', title: '站内课程', icon: Play },
   { id: 'tutor', title: 'AI 学伴', icon: MessageCircle },
 ];
 
-function getView() {
+function getRoute() {
   const id = window.location.hash.slice(1);
-  return links.some((link) => link.id === id) ? id : 'map';
+  return links.some((link) => link.id === id) || lessonEntries.has(id) || stages.some((stage) => 'stage-' + stage.id === id) ? id : 'map';
 }
 
 function readProgress(key, fallback) {
@@ -51,7 +54,7 @@ function stageLabel(id) {
   return id.startsWith('s6') ? `6${id.slice(2).toUpperCase()}` : id.slice(1);
 }
 
-function Sidebar({ view, selectedStage, selectedChapter, completed, dayDone, onStageSelect, onChapterSelect }) {
+function Sidebar({ view, selectedStage, selectedChapter, completed, dayDone, learningHref, completedWeeks, onStageSelect, onChapterSelect }) {
   return (
     <aside className="sidebar">
       <a href="#map" className="brand" aria-label="AI 学习图谱首页">
@@ -60,12 +63,12 @@ function Sidebar({ view, selectedStage, selectedChapter, completed, dayDone, onS
       </a>
       <nav className="primary-nav" aria-label="主导航">
         {links.map(({ id, title, icon: Icon }) => (
-          <a key={id} href={`#${id}`} aria-current={view === id ? 'page' : undefined}>
+          <a key={id} href={id === 'day-1' ? learningHref : '#' + id} aria-current={view === id || (id === 'day-1' && view === 'lesson') ? 'page' : undefined}>
             <Icon size={18} /><span>{title}</span>{id === 'day-1' && dayDone && <Check size={15} className="nav-done" />}
           </a>
         ))}
       </nav>
-      {view === 'map' && <span className="mobile-progress">学习进度 {completed.size} / {chapters.length} 章{dayDone && ' · 第一天已完成'}</span>}
+      {view === 'map' && <span className="mobile-progress">站内课 {completedWeeks} / {weekCount}{dayDone && ' · 第一天已完成'}</span>}
       {view === 'map' && <nav className="stage-nav" aria-label="学习阶段">
         <div className="section-caption">学习阶段 <span>{chapters.length} 章</span></div>
         {stages.map((stage) => {
@@ -94,8 +97,8 @@ function Sidebar({ view, selectedStage, selectedChapter, completed, dayDone, onS
         })}
       </nav>}
       {view === 'map' && <div className="sidebar-progress">
-        <div><span>学习进度</span><strong>{completed.size} / {chapters.length} 章</strong></div>
-        <progress aria-label="已完成章节" max={chapters.length} value={completed.size} />
+        <div><span>站内课程</span><strong>{completedWeeks} / {weekCount} 课</strong></div>
+        <progress aria-label="已完成站内课程" max={weekCount} value={completedWeeks} />
         <small>{dayDone ? '第一天练习已完成' : '从第一天课程开始'} · 进度保存在此浏览器</small>
       </div>}
     </aside>
@@ -111,7 +114,7 @@ function Project({ project }) {
   );
 }
 
-function Inspector({ stage, chapter, completed, onToggle, onChapterSelect, dayAction }) {
+function Inspector({ stage, chapter, completed, onToggle, onChapterSelect, learningAction, learningHref }) {
   if (chapter) {
     return (
       <section className="inspector panel" aria-label="章节详情">
@@ -126,6 +129,9 @@ function Inspector({ stage, chapter, completed, onToggle, onChapterSelect, dayAc
           ))}</div> : <p>可以直接开始。</p>}
         </div>
         {chapter.id === 2 && <a href="#day-1" className="action primary">打开第一天课程 <ArrowRight size={17} /></a>}
+        {chapterLessons(chapter.id).map((lesson) => <a key={lesson.key} className="action secondary" href={'#' + lesson.key}>
+          {lesson.chapter ? '拓展课' : '第 ' + lesson.week + ' 周'} · {lesson.title} <ArrowRight size={16} />
+        </a>)}
         <button className="action secondary" onClick={() => onToggle(chapter.id)} aria-pressed={completed.has(chapter.id)}>
           {completed.has(chapter.id) ? '已完成 · 点击取消' : '标记本章为已完成'} <Check size={17} />
         </button>
@@ -139,7 +145,8 @@ function Inspector({ stage, chapter, completed, onToggle, onChapterSelect, dayAc
         <span className="label-chip">第一天</span>
         <h2>{dayOne.title}</h2>
         <p>{dayOne.objective}</p>
-        <a href="#day-1" className="action primary">{dayAction} <ArrowRight size={18} /></a>
+        <a href={learningHref} className="action primary">{learningAction} <ArrowRight size={18} /></a>
+        {learningHref !== '#day-1' && <a href="#day-1" className="action secondary">复习第一天 <ArrowRight size={17} /></a>}
         <div className="inspector-note outcomes">
           <strong>练习目标</strong>
           <ul>
@@ -160,16 +167,17 @@ function Inspector({ stage, chapter, completed, onToggle, onChapterSelect, dayAc
       <p><GlossaryText text={stage.startHere} /></p>
       <div className="inspector-note"><strong>{stage.optional ? '为什么是选学' : '为什么现在学'}</strong><p><GlossaryText text={stage.reason} /></p></div>
       <div className="inspector-note"><strong>练习项目</strong><p>{stage.project.title}</p></div>
+      <a className="action primary" href={'#' + weeklyEntries.find((entry) => entry.stage.id === stage.id).key}>打开本阶段第一课 <ArrowRight size={17} /></a>
       <a className="action secondary" href={`#stage-${stage.id}`} onClick={(event) => { event.preventDefault(); document.getElementById(`stage-${stage.id}`)?.scrollIntoView({ block: 'start' }); }}>查看项目与章节 <ArrowRight size={17} /></a>
     </section>
   );
 }
 
-function RouteDetails({ onChapterSelect, completed, selectedStage }) {
+function RouteDetails({ onChapterSelect, completed, selectedStage, studyProgress }) {
   return (
     <section className="route-details" aria-labelledby="route-title">
       <h2 id="route-title">学习路线详情</h2>
-      <p>站内第一天和后续练习已开放。下方是 {weekCount} 周的学习路线，每个阶段先用一个例子说明要弄懂什么。带下划线的术语可以点开解释。</p>
+      <p>第一天之后，按这 {weekCount} 周进入站内课。每课从例子开始，依次完成演示、练习和结果核对。带下划线的术语可以点开解释。</p>
       <p>前五阶段是通用基础。方向课在通用路线中属于选学，本路线在完成主线后依次深入全部五个方向。</p>
       <div className="stage-list">
         {stages.map((stage, stageIndex) => (
@@ -187,12 +195,21 @@ function RouteDetails({ onChapterSelect, completed, selectedStage }) {
               <Project project={stage.project} />
               {stage.weeks?.length > 0 && <details className="weekly-plan">
                 <summary><ChevronDown size={16} />按周安排 <span>{stage.weeks.length} 周</span></summary>
-                <ol>{stage.weeks.map((week, index) => (
-                  <li key={week.title}>
-                    <span className="week-index">第 {stages.slice(0, stageIndex).reduce((total, prior) => total + prior.weeks.length, index + 1)} 周</span>
-                    <div><strong><GlossaryText text={week.title} /></strong><p><GlossaryText text={week.body} /></p></div>
-                  </li>
-                ))}</ol>
+                <ol>{stage.weeks.map((week, index) => {
+                  const number = stages.slice(0, stageIndex).reduce((total, prior) => total + prior.weeks.length, index + 1);
+                  const href = weekHref(number);
+                  const progress = studyProgress[href.slice(1)];
+                  return (
+                    <li key={week.title}>
+                      <span className="week-index">第 {number} 周</span>
+                      <div><strong><GlossaryText text={week.title} /></strong><p><GlossaryText text={week.body} /></p>
+                        <a className="week-directory-link" href={href} aria-label={'第 ' + number + ' 周：' + week.title}>
+                          {progress?.completed ? '复习这节课' : progress ? '继续这节课' : '进入站内课'} <ArrowRight size={14} />
+                        </a>
+                      </div>
+                    </li>
+                  );
+                })}</ol>
               </details>}
               {stage.resources?.length > 0 && <div className="stage-resources"><strong>学习资料</strong>{stage.resources.map(({ title, url }) => (
                 <a key={url} href={url} target="_blank" rel="noreferrer">{title} <ArrowRight size={14} /></a>
@@ -220,7 +237,7 @@ function RouteDetails({ onChapterSelect, completed, selectedStage }) {
 }
 
 export default function App() {
-  const [view, setView] = useState(getView);
+  const [route, setRoute] = useState(getRoute);
   const [selectedStage, setStage] = useState('s1');
   const [selectedChapter, setChapter] = useState(null);
   const [completedIds, setCompletedIds] = useProgress('chapters', []);
@@ -231,10 +248,17 @@ export default function App() {
   const [position, setPosition] = useProgress('day-one-guide', null);
   const [draft, setDraft] = useProgress('day-one-judgment-draft', null);
   const [experiment, setExperiment] = useProgress('day-one-experiment', '');
+  const [studyProgress, setStudyProgress] = useProgress('weekly-study', {});
+  const [lastLessonKey, setLastLessonKey] = useProgress('weekly-resume', null);
+  const lessonEntry = lessonEntries.get(route);
+  const view = lessonEntry ? 'lesson' : route.startsWith('stage-') ? 'map' : route;
   const completed = new Set(completedIds);
   const stage = stages.find(({ id }) => id === selectedStage) ?? stages[0];
   const chapter = chapterById.get(selectedChapter);
-  const dayAction = dayDone ? '复习第一天' : position || reflection ? '继续学习' : '开始学习';
+  const learningHref = lessonEntries.has(lastLessonKey) ? '#' + lastLessonKey : dayDone ? weekHref(1) : '#day-1';
+  const completedWeeks = weeklyEntries.filter(({ key }) => studyProgress[key]?.completed).length;
+  const learningAction = completedWeeks === weekCount ? '复习课程' : learningHref !== '#day-1' || position || reflection ? '继续学习' : '开始学习';
+  const viewTitle = lessonEntry ? lessonEntry.week ? '第 ' + lessonEntry.week + ' 周' : '拓展课' : view === 'day-1' ? '第一天课程' : links.find(({ id }) => id === view).title;
   const tutorPanel = reflection && scopeConfirmed && (
     <Suspense fallback={<div className="lesson-card panel" role="status">正在打开 AI 学伴…</div>}>
       <Tutor context={`AI 学习图谱 · 第一阶段第一天：${dayOne.title}\n${dayOne.objective}\n${dayOne.prompt}\n\n学习者已保存自己的判断。\n预计保留 ${reflection.rows} 条。\n理由：${reflection.reason}\n证据：${reflection.evidence}`} />
@@ -242,15 +266,25 @@ export default function App() {
   );
 
   useEffect(() => {
-    const handleHash = () => setView(getView());
+    const handleHash = () => setRoute(getRoute());
     window.addEventListener('hashchange', handleHash);
     return () => window.removeEventListener('hashchange', handleHash);
   }, []);
 
   useEffect(() => {
+    document.title = viewTitle + ' · AI 学习图谱';
+    if (route.startsWith('stage-')) {
+      setStage(route.slice(6));
+      setChapter(null);
+      const frame = requestAnimationFrame(() => document.getElementById(route)?.scrollIntoView({ block: 'start' }));
+      return () => cancelAnimationFrame(frame);
+    }
     window.scrollTo(0, 0);
-    document.title = `${links.find(({ id }) => id === view).title} · AI 学习图谱`;
-  }, [view]);
+  }, [route, viewTitle]);
+
+  useEffect(() => {
+    if (lessonEntry) setLastLessonKey(lessonEntry.key);
+  }, [lessonEntry, setLastLessonKey]);
 
   function showMap(scroll) {
     if (view !== 'map') window.location.hash = 'map';
@@ -275,14 +309,25 @@ export default function App() {
     setCompletedIds((old) => old.includes(id) ? old.filter((value) => value !== id) : [...old, id]);
   }
 
+  function updateLesson(changes) {
+    const key = lessonEntry.key;
+    setStudyProgress((old) => ({ ...old, [key]: { ...old[key], ...changes } }));
+  }
+
+  function continueLesson(nextKey) {
+    updateLesson({ completed: true });
+    if (nextKey) setLastLessonKey(nextKey);
+    window.location.hash = nextKey ?? 'map';
+  }
+
   return (
     <div className="atlas-shell">
       <a className="skip-link" href="#main-content" onClick={(event) => { event.preventDefault(); document.getElementById('main-content')?.focus(); }}>跳到主要内容</a>
-      <Sidebar view={view} selectedStage={selectedStage} selectedChapter={selectedChapter} completed={completed} dayDone={dayDone} onStageSelect={selectStage} onChapterSelect={selectChapter} />
+      <Sidebar view={view} selectedStage={selectedStage} selectedChapter={selectedChapter} completed={completed} dayDone={dayDone} learningHref={learningHref} completedWeeks={completedWeeks} onStageSelect={selectStage} onChapterSelect={selectChapter} />
       <main className="workspace" id="main-content" tabIndex={-1}>
         <header className="topbar">
-          <div className="breadcrumb"><span>学习路线</span><ChevronRight size={15} /><span>{links.find(({ id }) => id === view).title}</span></div>
-          {view === 'map' ? <a className="action top-action" href="#day-1">{dayAction} <ArrowRight size={16} /></a> : <a className="action top-action" href={view === 'tutor' ? '#day-1' : '#map'}><LayoutGrid size={16} />{view === 'tutor' ? '返回课程' : '返回图谱'}</a>}
+          <div className="breadcrumb"><span>学习路线</span><ChevronRight size={15} /><span>{viewTitle}</span></div>
+          {view === 'map' ? <a className="action top-action" href={learningHref}>{learningAction} <ArrowRight size={16} /></a> : <a className="action top-action" href={view === 'tutor' ? '#day-1' : '#map'}><LayoutGrid size={16} />{view === 'tutor' ? '返回第一天' : '返回图谱'}</a>}
         </header>
         {view === 'map' && (
           <>
@@ -296,9 +341,9 @@ export default function App() {
                   <KnowledgeGraph selectedStage={stage.id} selectedChapter={selectedChapter} completed={completed} onStageSelect={selectStage} onChapterSelect={selectChapter} />
                 </Suspense>
               </section>
-              <Inspector stage={stage} chapter={chapter} completed={completed} onToggle={toggleCompleted} onChapterSelect={selectChapter} dayAction={dayAction} />
+              <Inspector stage={stage} chapter={chapter} completed={completed} onToggle={toggleCompleted} onChapterSelect={selectChapter} learningAction={learningAction} learningHref={learningHref} />
             </div>
-            <RouteDetails selectedStage={selectedStage} onChapterSelect={selectChapter} completed={completed} />
+            <RouteDetails selectedStage={selectedStage} onChapterSelect={selectChapter} completed={completed} studyProgress={studyProgress} />
           </>
         )}
         {view === 'day-1' && (
@@ -306,9 +351,13 @@ export default function App() {
             reflection={reflection} setReflection={setReflection} scopeConfirmed={scopeConfirmed} setScopeConfirmed={setScopeConfirmed}
             position={position} setPosition={setPosition} draft={draft} setDraft={setDraft} experiment={experiment} setExperiment={setExperiment} tutorPanel={tutorPanel} />
         )}
+        {lessonEntry && <Suspense fallback={<p className="graph-loading" role="status">正在打开站内课程…</p>}>
+          <WeeklyLesson key={lessonEntry.key} entry={lessonEntry} state={studyProgress[lessonEntry.key] ?? emptyWeek}
+            onUpdate={updateLesson} onContinue={continueLesson} overviewHref={'#stage-' + lessonEntry.stage.id} />
+        </Suspense>}
         {view === 'tutor' && (
           <div className="tutor-page">
-            <div className="hero"><h1>AI 学伴</h1><p>用提示提问、解释代码和排查错误，最后由你验证结果。</p></div>
+            <div className="hero"><h1>AI 学伴</h1><p>第一天课程的辅学工具。用提示提问、解释代码和排查错误，最后由你验证结果。</p></div>
             {tutorPanel || (
               <section className="lesson-card panel tutor-gate">
                 <div className="lesson-section-title"><LockKeyhole size={22} /><h2>{reflection ? '先确认委托范围与规则' : '先做一次独立判断'}</h2></div>

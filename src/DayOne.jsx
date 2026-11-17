@@ -3,6 +3,7 @@ import { ArrowLeft, ArrowRight, Check, Clock3, Copy, Download } from 'lucide-rea
 import CsvWalkthrough from './CsvWalkthrough.jsx';
 import { ChangeScript, downloadText, FileFlow, RunScript, SaveScript, WeekPractice } from './DayOnePractice.jsx';
 import { GlossaryText, LessonTerm } from './LessonTerm.jsx';
+import { weekHref } from './data/lesson-index.js';
 import './lesson-guide.css';
 
 const guideSteps = [
@@ -280,13 +281,13 @@ export default function DayOne({
               {step === finish && (
                 <>
                   <details className="review-box"><summary>核对复跑结果</summary>{experiment.trim() && <p><strong>你的记录</strong>　{experiment.trim()}</p>}<p>{lesson.reviewAnswer}</p></details>
-                  <div className="guide-complete"><h3>下一项 · 用三种边界样本测试脚本</h3><p>第 1 周继续用今天的脚本，验证它能否处理正常、全空和分类冲突三种情况。</p><WeekPractice /></div>
+                  <div className="guide-complete"><h3>下一课 · 用三种样本检查清洗规则</h3><p>第 1 周会先在站内演示普通、全空和分类冲突三种样本，再用新的数据练习。也可以下载材料，用自己的脚本复跑。</p><WeekPractice /></div>
                 </>
               )}
             </div>
             <div className="guide-actions">
               {step > 0 && <button className="action secondary" type="button" onClick={() => openStep(step - 1)}><ArrowLeft size={16} />{current ? '上一步' : '回顾最后一步'}</button>}
-              {current ? buttons[step] : <a className="action secondary" href="#map">返回图谱</a>}
+              {current ? buttons[step] : <a className="action primary" href={weekHref(1)}>进入第 1 周 · 下一课 <ArrowRight size={17} /></a>}
             </div>
           </section>
         </div>

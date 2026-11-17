@@ -126,6 +126,8 @@ summary::-webkit-details-marker { display: none; }
 .weekly-plan ol { list-style: none; padding: 0; margin: 8px 0 0; }
 .weekly-plan li { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 11px; border-top: 1px solid #ece8e3; padding: 8px 0; font-size: 13px; }
 .weekly-plan li p { color: var(--muted); font-size: 12px; margin-top: 4px; line-height: 1.55; }
+.week-directory-link { display: inline-flex; align-items: center; gap: 5px; margin-top: 5px; padding: 4px 2px; color: var(--accent-deep); font-size: 12px; font-weight: 740; }
+.week-directory-link:hover { text-decoration: underline; text-underline-offset: 3px; }
 .week-index { font-size: 11px; padding-top: 2px; white-space: nowrap; }
 .stage-resources { display: flex; flex-wrap: wrap; align-items: center; gap: 7px 13px; font-size: 12px; }
 .stage-resources a, .lesson-resources a { display: inline-flex; gap: 5px; align-items: center; color: var(--accent-deep); text-decoration: underline; text-underline-offset: 3px; }

@@ -8,15 +8,18 @@ import './lesson-term.css';
 const glossary = { ...roadmapGlossary, ...lessonGlossary };
 const escapeTerm = (term) => term.replace(/[.*+?^$()[\]{}|\\]/g, '\\$&');
 const inlineTerms = Object.keys(glossary).filter((term) => term !== '记录' && term !== '编码');
-const termPattern = new RegExp('(' + inlineTerms.sort((left, right) => right.length - left.length).map(escapeTerm).join('|') + ')', 'g');
+function makeTermPattern(terms) {
+  return new RegExp('(' + terms.sort((left, right) => right.length - left.length).map(escapeTerm).join('|') + ')', 'g');
+}
+const termPattern = makeTermPattern(inlineTerms);
 
-export function LessonTerm({ term, children }) {
+export function LessonTerm({ term, children, definition: lessonDefinition }) {
   const [open, setOpen] = useState(false);
   const control = useRef(null);
   const bubble = useRef(null);
   const closeButton = useRef(null);
   const id = useId();
-  const definition = glossary[term];
+  const definition = lessonDefinition ?? glossary[term];
   const label = typeof children === 'string' ? children : term;
 
   function close() {
@@ -95,11 +98,13 @@ export function LessonTerm({ term, children }) {
   );
 }
 
-export function GlossaryText({ text }) {
+export function GlossaryText({ text, definitions }) {
+  const dictionary = definitions ? { ...glossary, ...definitions } : glossary;
+  const pattern = definitions ? makeTermPattern([...new Set([...inlineTerms, ...Object.keys(definitions)])]) : termPattern;
   const seen = new Set();
-  return text.split(termPattern).map((word, index) => {
-    if (!Object.hasOwn(glossary, word) || seen.has(word)) return word;
+  return text.split(pattern).map((word, index) => {
+    if (!Object.hasOwn(dictionary, word) || seen.has(word)) return word;
     seen.add(word);
-    return <LessonTerm term={word} key={index} />;
+    return <LessonTerm term={word} definition={dictionary[word]} key={index} />;
   });
 }
