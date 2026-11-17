@@ -111,6 +111,7 @@ summary::-webkit-details-marker { display: none; }
 .stage-num, .mono, .week-index { font-family: "IBM Plex Mono", Consolas, monospace; color: var(--accent-deep); font-weight: 700; }
 .duration { color: var(--muted); font-size: 12px; font-weight: 500; }
 .stage-expanded { padding: 13px 16px 15px; display: grid; gap: 11px; }
+.stage-expanded .stage-start-here { border-left: 3px solid #9787cc; background: #f5f1fb; padding: 7px 10px; border-radius: 0 7px 7px 0; }
 .project-box { display: grid; grid-template-columns: auto 1fr; gap: 9px; background: #f0ebfb; border-radius: 8px; padding: 11px; font-size: 13px; color: var(--accent-deep); }
 .project-box p { color: #443c60; margin-top: 4px; line-height: 1.55; }
 .chapter-list { list-style: none; padding: 0; margin: 0; }

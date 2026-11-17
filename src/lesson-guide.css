@@ -53,6 +53,18 @@
 .guide-inline { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; min-width: 0; }
 .guide-note { display: block; min-width: 0; padding: 10px 12px; border-left: 3px solid #8a79cf; border-radius: 0 7px 7px 0; background: var(--guide-tint); color: #423668; font-size: 13px; line-height: 1.65; overflow-wrap: anywhere; }
 .guide-note:empty { display: none; }
+.guide-terms-note { color: var(--muted); font-size: 12px; }
+.guide-file-flow ol { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); list-style: none; padding: 0; gap: 8px; margin: 0; }
+.guide-file-flow li { min-width: 0; display: grid; gap: 3px; border: 1px solid #e5deef; border-radius: 8px; padding: 8px 10px; color: var(--ink); background: #fcfaf7; font-size: 12px; }
+.guide-file-flow code { color: var(--accent-deep); overflow-wrap: anywhere; }
+.guide-file-flow span { color: var(--muted); line-height: 1.55; }
+.guide-instructions { color: var(--ink); font-size: 14px; }
+.guide-instructions code, .guide-block > p code { color: var(--accent-deep); overflow-wrap: anywhere; }
+.guide-block p a { color: var(--accent-deep); text-decoration: underline; text-underline-offset: 3px; }
+.guide-code { padding: 8px; margin: 6px 0; background: #f1edf7; border: 1px solid #e1d9ef; border-radius: 7px; white-space: pre-wrap; overflow-wrap: anywhere; color: #382f54; font-size: 12px; }
+.guide-test-cases { display: grid; gap: 9px; margin: 9px 0; }
+.guide-test-cases article { border: 1px solid #e3d9ef; border-radius: 8px; padding: 8px 10px; }
+.guide-test-cases article .review-box { margin-top: 6px; }
 .guide-quiz { display: grid; gap: 8px; padding: 12px; border: 1px solid var(--guide-soft-line); border-radius: 9px; }
 .guide-quiz h3 { font-size: 16px; }
 .guide-quiz > p { color: var(--muted); font-size: 13px; }
@@ -119,6 +131,7 @@
   .guide-content { gap: 11px; padding-top: 12px; }
   .guide-actions { margin-top: 13px; padding-top: 12px; }
   .guide-sidebar { gap: 10px; }
+  .guide-file-flow ol { grid-template-columns: minmax(0, 1fr); }
 }
 
 @media (max-width: 360px) {

@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { dayOne, stages } from './data/course.js';
 import DayOne from './DayOne.jsx';
+import { GlossaryText } from './LessonTerm.jsx';
 
 const KnowledgeGraph = lazy(() => import('./KnowledgeGraph.jsx'));
 const Tutor = lazy(() => import('./Tutor.jsx'));
@@ -105,7 +106,7 @@ function Project({ project }) {
   return (
     <div className="project-box">
       <Target size={19} />
-      <div><strong>{project.title}</strong><p>{project.brief}</p><p><b>验收</b>　{project.acceptance}</p></div>
+      <div><strong>{project.title}</strong><p><GlossaryText text={project.brief} /></p><p><b>验收</b>　<GlossaryText text={project.acceptance} /></p></div>
     </div>
   );
 }
@@ -115,9 +116,9 @@ function Inspector({ stage, chapter, completed, onToggle, onChapterSelect, dayAc
     return (
       <section className="inspector panel" aria-label="章节详情">
         <span className={`label-chip ${chapter.optional || stage.optional ? 'elective' : ''}`}>第 {chapter.id} 章 · {chapter.optional || stage.optional ? '选学' : '先学'}</span>
-        <h2>{chapter.title}</h2>
-        <p>{chapter.description}</p>
-        {(chapter.reason || stage.optional) && <div className="inspector-note"><strong>{chapter.optional || stage.optional ? '选学理由' : '学习重点'}</strong><p>{chapter.reason || stage.reason}</p></div>}
+        <h2><GlossaryText text={chapter.title} /></h2>
+        <p><GlossaryText text={chapter.description} /></p>
+        {(chapter.reason || stage.optional) && <div className="inspector-note"><strong>{chapter.optional || stage.optional ? '选学理由' : '学习重点'}</strong><p><GlossaryText text={chapter.reason || stage.reason} /></p></div>}
         <div className="inspector-note">
           <strong>前置章节</strong>
           {chapter.requires.length ? <div className="prerequisites">{chapter.requires.map((id) => (
@@ -156,8 +157,8 @@ function Inspector({ stage, chapter, completed, onToggle, onChapterSelect, dayAc
     <section className="inspector panel" aria-label="阶段详情">
       <span className={`label-chip ${stage.optional ? 'elective' : ''}`}>阶段 {stageLabel(stage.id)} · {stage.optional ? '方向选学' : '主线'}</span>
       <h2>{stage.title}</h2>
-      <p>{stage.summary}</p>
-      <div className="inspector-note"><strong>{stage.optional ? '为什么是选学' : '为什么现在学'}</strong><p>{stage.reason}</p></div>
+      <p><GlossaryText text={stage.startHere} /></p>
+      <div className="inspector-note"><strong>{stage.optional ? '为什么是选学' : '为什么现在学'}</strong><p><GlossaryText text={stage.reason} /></p></div>
       <div className="inspector-note"><strong>练习项目</strong><p>{stage.project.title}</p></div>
       <a className="action secondary" href={`#stage-${stage.id}`} onClick={(event) => { event.preventDefault(); document.getElementById(`stage-${stage.id}`)?.scrollIntoView({ block: 'start' }); }}>查看项目与章节 <ArrowRight size={17} /></a>
     </section>
@@ -168,7 +169,8 @@ function RouteDetails({ onChapterSelect, completed, selectedStage }) {
   return (
     <section className="route-details" aria-labelledby="route-title">
       <h2 id="route-title">学习路线详情</h2>
-      <p>{weekCount} 周。前五阶段是通用基础。方向课在通用路线中属于选学，本路线在完成主线后依次深入全部五个方向。</p>
+      <p>站内第一天和后续练习已开放。下方是 {weekCount} 周的学习路线，每个阶段先用一个例子说明要弄懂什么。带下划线的术语可以点开解释。</p>
+      <p>前五阶段是通用基础。方向课在通用路线中属于选学，本路线在完成主线后依次深入全部五个方向。</p>
       <div className="stage-list">
         {stages.map((stage, stageIndex) => (
           <details key={stage.id} id={`stage-${stage.id}`} className="stage-row" open={stage.id === selectedStage ? true : undefined}>
@@ -179,15 +181,16 @@ function RouteDetails({ onChapterSelect, completed, selectedStage }) {
               <span className="duration">{stage.duration}</span>
             </summary>
             <div className="stage-expanded">
-              <p>{stage.summary}</p>
-              <p><strong>{stage.optional ? '选学理由' : '学习理由'}</strong>　{stage.reason}</p>
+              <p className="stage-start-here"><strong>先理解这个例子</strong>　<GlossaryText text={stage.startHere} /></p>
+              <p><GlossaryText text={stage.summary} /></p>
+              <p><strong>{stage.optional ? '选学理由' : '学习理由'}</strong>　<GlossaryText text={stage.reason} /></p>
               <Project project={stage.project} />
               {stage.weeks?.length > 0 && <details className="weekly-plan">
                 <summary><ChevronDown size={16} />按周安排 <span>{stage.weeks.length} 周</span></summary>
                 <ol>{stage.weeks.map((week, index) => (
                   <li key={week.title}>
                     <span className="week-index">第 {stages.slice(0, stageIndex).reduce((total, prior) => total + prior.weeks.length, index + 1)} 周</span>
-                    <div><strong>{week.title}</strong><p>{week.body}</p></div>
+                    <div><strong><GlossaryText text={week.title} /></strong><p><GlossaryText text={week.body} /></p></div>
                   </li>
                 ))}</ol>
               </details>}
@@ -204,7 +207,7 @@ function RouteDetails({ onChapterSelect, completed, selectedStage }) {
                       {completed.has(chapter.id) && <Check size={16} />}
                       <ChevronRight size={16} className="chapter-arrow" />
                     </button>
-                    {chapter.optional && <p>{chapter.reason}</p>}
+                    {chapter.optional && <p><GlossaryText text={chapter.reason} /></p>}
                   </li>
                 ))}
               </ul>

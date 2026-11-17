@@ -4,7 +4,7 @@
 
 这是一份面向零基础学习者的 58 周人工智能路线。40 章分成五个通用阶段和五个方向。方向课附有选学理由，适用于完成通用基础之后。本路线按顺序纳入五个方向，每个阶段都有项目与验收要求。
 
-第一天用一份 10 行 CSV 练习。课程逐步显示当前任务和下一项，从认识 CSV 到修改规则并复跑。先保存自己的判断、理由和证据，确认委托范围，再使用 AI。步骤、草稿、判断和复跑记录都保存在当前浏览器中。使用在线学伴时，只有主动发送才会把本次问题和当前课程上下文交给所选模型。
+第一天用一份 10 行 CSV 练习，包含三份文件的角色图、四条记录的逐条演示、可点击术语、保存与运行说明，以及可下载的参考脚本。先保存自己的判断、理由和证据，确认委托范围，再使用 AI。步骤、草稿、判断和复跑记录都保存在当前浏览器中。使用在线学伴时，只有主动发送才会把本次问题和当前课程上下文交给所选模型。第一天结束后，提供三组可下载的额外练习。其余安排按 58 周路线展示。
 
 ## 本地运行
 
@@ -35,6 +35,8 @@ GitHub Pages 上可直接复制提示词，交给已有的 AI 聊天工具。要
 官方接口文档：[OpenAI Responses](https://developers.openai.com/api/reference/resources/responses/methods/create) · [Claude Messages](https://platform.claude.com/docs/en/api/messages/create) · [DeepSeek Chat Completions](https://api-docs.deepseek.com/api/create-chat-completion/) · [Qwen OpenAI 兼容接口](https://www.alibabacloud.com/help/en/model-studio/compatibility-of-openai-with-dashscope)
 
 ## 用于下一门课程
+
+新课先交代对象从哪里来、谁对它做什么、做到什么状态才能继续、去哪里核对结果。术语首次出现先给白话或例子，正式说明放进可关闭的气泡。练习先示范一次，再请学习者预测、操作和对照结果。周计划引入新工具前，先安排一个手算或可观察的例子。
 
 课程数据位于 `src/data/course.js`。每门课程可以沿用阶段、周安排、资源、实践项目和验收的结构。用章节 `requires` 写前置关系，给选学章节和阶段写出具体理由。课程首页和第一天练习可以沿用页面结构，按主题替换交互和视觉。新课程放在独立仓库时，更新网站名称、页面链接和浏览器进度键。
 

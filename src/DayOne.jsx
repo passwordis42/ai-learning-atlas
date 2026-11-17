@@ -1,9 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { ArrowLeft, ArrowRight, Check, Clock3, Copy, Download } from 'lucide-react';
+import CsvWalkthrough from './CsvWalkthrough.jsx';
+import { ChangeScript, downloadText, FileFlow, RunScript, SaveScript, WeekPractice } from './DayOnePractice.jsx';
+import { GlossaryText, LessonTerm } from './LessonTerm.jsx';
 import './lesson-guide.css';
 
 const guideSteps = [
-  { title: '认识 CSV', task: '先分清表头、空记录和重复记录，再去看真实样本。', minutes: 5 },
+  { title: '先认识原表、脚本和结果表', task: '先看三个文件从哪里来，再跟着一条例子判断何时保留、何时跳过。', minutes: 5 },
   { title: '手算并记录判断', task: '根据规则预测清洗后会剩几条，并写出你检查了哪些记录。', minutes: 10 },
   { title: '请 AI 起草脚本', task: '确认输入、处理规则和输出文件，然后请 AI 生成脚本。', minutes: 10 },
   { title: '运行并核对', task: '运行脚本，把它生成的文件和你手算的结果逐条对照。', minutes: 20 },
@@ -28,21 +31,12 @@ function judgmentReady(fields) {
   return fields.rows !== '' && Number.isInteger(rows) && rows >= 0 && rows <= 10 && Boolean(fields.reason.trim() && fields.evidence.trim());
 }
 
-function downloadExercise(csv) {
-  const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = 'tickets.csv';
-  link.click();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
-}
-
 function Sample({ csv }) {
   return (
     <details className="guide-sample" open>
-      <summary>查看 10 条样本</summary>
+      <summary>查看 10 条客服记录</summary>
       <div className="code-frame">
-        <div><span>tickets.csv</span><button className="action small-action" onClick={() => downloadExercise(csv)}><Download size={15} />下载样本</button></div>
+        <div><span>tickets.csv</span><button className="action small-action" type="button" onClick={() => downloadText('tickets.csv', csv, 'text/csv')}><Download size={15} />下载样本</button></div>
         <pre><code>{csv.trimEnd()}</code></pre>
       </div>
     </details>
@@ -113,6 +107,7 @@ function AiDraft({ lesson, reflection, scopeConfirmed, setScopeConfirmed, tutorP
       <details className="review-box"><summary>核对手算结果</summary><p>{lesson.expectedSummary}</p></details>
       <div className="guide-block">
         <h3>核对委托范围</h3>
+        <p>你先确认下面三条。确认后可以把<LessonTerm term="提示词" />交给 AI，让它回一段代码。接着由你把代码存为<LessonTerm term="脚本" />文件。</p>
         <ul>
           <li>输入文件是 <code>tickets.csv</code>，先去掉字段首尾空白，再丢弃两列都为空的记录。</li>
           <li>只有问题和分类都相同才算重复，保留第一次出现的记录。</li>
@@ -131,6 +126,7 @@ function AiDraft({ lesson, reflection, scopeConfirmed, setScopeConfirmed, tutorP
           </div>
           {copyStatus && <p className="guide-note" role="status">{copyStatus}</p>}
           {showTutor && tutorPanel}
+          <SaveScript csv={lesson.csv} />
         </div>
       )}
     </>
@@ -149,21 +145,6 @@ function Checks({ items, labels, checklist, onCheck }) {
   );
 }
 
-function WeekPractice() {
-  return (
-    <details className="review-box">
-      <summary className="action primary">打开下一项练习 <ArrowRight size={16} /></summary>
-      <p>在单独的练习文件夹里保留两版脚本和原样本。每次将测试样本放在脚本旁边并命名为 tickets.csv，先写预期，再运行并保存结果。</p>
-      <ul>
-        <li>正常样本：放入一条有效记录，验证它会被保留。</li>
-        <li>全空样本：只填两个空字段，验证输出是否仍保留表头。</li>
-        <li>分类冲突：同一问题配两个分类，比较两种去重规则各保留什么。</li>
-      </ul>
-      <p>记录在什么输入下结果不符合预期，并尝试用一句话说明原因。</p>
-    </details>
-  );
-}
-
 export default function DayOne({
   lesson, checklist, setChecklist, done, setDone, reflection, setReflection, scopeConfirmed, setScopeConfirmed,
   position, setPosition, draft, setDraft, experiment, setExperiment, tutorPanel,
@@ -177,6 +158,8 @@ export default function DayOne({
   const headingRef = useRef(null);
   const justNavigated = useRef(false);
   const draftValue = draft ?? (reflection ? { ...reflection, rows: String(reflection.rows) } : emptyDraft);
+  const changePrediction = position?.changePrediction ?? '';
+  const canChange = Boolean(position?.changeReady || checklist.includes(4) || experiment.trim());
 
   useEffect(() => {
     if (justNavigated.current) {
@@ -226,7 +209,7 @@ export default function DayOne({
       <header className="guide-header">
         <div className="hero-meta"><span className="label-chip">阶段 1 · 第 1 周 · 第一天</span><span className="time-note"><Clock3 size={16} />约 {lesson.minutes} 分钟</span></div>
         <h1>{lesson.title}</h1>
-        <p>今天从一份小样本开始。你会先手算，再请 AI 写代码，最后亲手改一条规则。</p>
+        <p>我们用<LessonTerm term="CSV" />装一张客服表，用<LessonTerm term="脚本" />告诉电脑如何去掉多余的行。你先手算，再请 AI 写代码，最后亲手改一条规则。</p>
       </header>
       <div className="guide-progress">
         <div className="guide-progress-copy"><strong>{current ? `第 ${step + 1} / ${finish} 步` : '第一天已完成'}</strong><span>{reached} / {finish} 步已完成</span></div>
@@ -244,15 +227,18 @@ export default function DayOne({
             <div className="guide-content" key={step}>
               {step === 0 && (
                 <>
+                  <p className="guide-terms-note">带下划线的词可以点开，看白话、例子和正式定义。</p>
+                  <FileFlow />
                   <div className="concept-grid">
-                    {lesson.concepts.map((concept) => <article key={concept.title}><h3>{concept.title}</h3><p>{concept.body}</p><p className="example">{concept.example}</p></article>)}
+                    {lesson.concepts.map((concept) => <article key={concept.title}><h3><GlossaryText text={concept.title} /></h3><p><GlossaryText text={concept.body} /></p><p className="example">{concept.example}</p></article>)}
                   </div>
+                  <details className="review-box"><summary>先看演示 · 脚本怎样逐条处理</summary><CsvWalkthrough /></details>
                   <ConceptCheck answer={position?.answer} onAnswer={(answer) => setPosition((old) => ({ ...old, answer }))} />
                 </>
               )}
               {step === 1 && (
                 <>
-                  <p>先删除两列都为空的记录。再比较每一行的「问题」和「分类」，两列都相同时，只保留第一次出现的记录。表头不计入样本数。</p>
+                  <p>你现在用眼睛做一遍脚本之后要做的事。读到一条<LessonTerm term="记录" />，先忽略每格首尾的空白。两格都空就划掉。否则比较「问题」和「分类」，两格都相同只留最早的那条。<LessonTerm term="表头" />只写着列名。</p>
                   <Sample csv={lesson.csv} />
                   <details className="review-box"><summary>卡住了？看一条提示</summary><p>给数据从 1 开始编号。先圈出只有逗号的那行。再从上往下比较，只在两个字段都相同时划掉后出现的那条。</p></details>
                   <Judgment draft={draftValue} setDraft={(update) => setDraft((old) => update(old ?? draftValue))} onSave={saveJudgment} />
@@ -262,27 +248,33 @@ export default function DayOne({
               {step === 2 && <AiDraft lesson={lesson} reflection={reflection} scopeConfirmed={scopeConfirmed} setScopeConfirmed={confirmScope} tutorPanel={tutorPanel} />}
               {step === 3 && (
                 <>
-                  <div className="guide-block">
-                    <p>把 <code>clean_tickets.py</code> 和 <code>tickets.csv</code> 放在同一个文件夹。打开这个文件夹的终端，运行：</p>
-                    <div className="code-frame"><pre><code>python clean_tickets.py</code></pre></div>
-                    <p>Windows 也可以用 <code>py clean_tickets.py</code>。运行后打开生成的 <code>clean_tickets.csv</code>。</p>
-                  </div>
-                  <details className="review-box"><summary>找不到文件？先检查这里</summary><p>确认脚本和样本在同一个文件夹，终端也打开在该目录。检查文件名是不是完整的 tickets.csv，脚本是不是以 .py 结尾。</p></details>
-                  <p className="guide-note" role="status">{lesson.expectedSummary}</p>
+                  <RunScript expectedSummary={lesson.expectedSummary} />
                   <Checks items={outputChecks} labels={lesson.checklist} checklist={checklist} onCheck={toggleCheck} />
                   {!ranChecks && <p className="fineprint">核对这三项后就能继续。</p>}
                 </>
               )}
               {step === 4 && (
                 <>
-                  <p>先复制一份能跑通的脚本，保留原来的版本供对照。</p>
-                  <p>{lesson.steps[4].body}</p>
                   <div className="guide-block reflection">
-                    <label>这次保留了几条？为什么？
-                      <textarea rows={3} maxLength={650} value={experiment} placeholder="先写下实际结果，再解释哪条记录的命运变了。" onChange={(event) => setExperiment(event.target.value)} />
+                    <label>{lesson.reviewQuestion}
+                      <textarea rows={2} maxLength={350} value={changePrediction} readOnly={canChange} placeholder="先写你的预测和对应的记录。" onChange={(event) => {
+                        const value = event.target.value;
+                        setPosition((old) => ({ ...old, changePrediction: value }));
+                      }} />
                     </label>
+                    {!canChange && <button className="action secondary" type="button" disabled={!changePrediction.trim()} onClick={() => setPosition((old) => ({ ...old, changeReady: true }))}>保存预测，查看改法</button>}
                   </div>
-                  {!experiment.trim() && !checklist.includes(4) && <p className="fineprint">记下运行结果和原因后，就能完成今天的练习。</p>}
+                  {canChange && (
+                    <>
+                      <ChangeScript />
+                      <div className="guide-block reflection">
+                        <label>这次保留了几条？为什么？
+                          <textarea rows={3} maxLength={650} value={experiment} placeholder="写下实际保留条数、少了哪条，以及你的解释。" onChange={(event) => setExperiment(event.target.value)} />
+                        </label>
+                      </div>
+                      {!experiment.trim() && !checklist.includes(4) && <p className="fineprint">记录两版的差异和原因后，就能完成今天的练习。</p>}
+                    </>
+                  )}
                 </>
               )}
               {step === finish && (

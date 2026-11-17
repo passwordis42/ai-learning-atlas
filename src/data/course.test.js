@@ -7,7 +7,7 @@ test('the learning route covers 40 chapters and 58 weeks with valid prerequisite
   const seen = new Set();
   for (const stage of stages) {
     assert.equal(stage.weeks.length, Number.parseInt(stage.duration, 10));
-    assert.ok(stage.resources.length && stage.project.acceptance);
+    assert.ok(stage.resources.length && stage.project.acceptance && stage.startHere);
     if (stage.optional) assert.ok(stage.reason);
     for (const chapter of stage.chapters) {
       if (chapter.optional) assert.ok(chapter.reason);
